@@ -1,0 +1,45 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+apply plugin: 'application'
+
+group = 'org.terasology'
+version = '1.0'
+mainClassName = 'org.terasology.bot.MyMain'
+
+applicationDefaultJvmArgs = ["-Djava.util.logging.config.file=logging.properties"]
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile group: 'pircbot', name: 'pircbot', version: '1.5.0'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.5'
+}
+
+
+task sourceJar(type: Jar) {
+    description = "Create a JAR with all sources"
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    description = "Create a JAR with the JavaDoc for the java sources"
+    from javadoc.destinationDir
+    classifier = 'javadoc'
+}
+
+distributions {
+    main {
+        contents {
+            from ('logging.properties') {
+                into 'bin'
+            }
+        }
+    }
+}

@@ -27,7 +27,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Logger;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -45,6 +50,10 @@ public class MyBot extends PircBot
 
     private final URL slackUrl;
 
+    private final Set<String> channelsToJoin = new HashSet<>();
+
+    private final Timer timer = new Timer(true);
+
     /**
      * @param name the name of the bot
      * @param slackToken the access token for Slack's "Incoming WebHook"
@@ -61,6 +70,12 @@ public class MyBot extends PircBot
 
     @Override
     protected void onJoin(String channel, String sender, String login, String hostname) {
+        if (Objects.equals(login, getLogin())) {
+            if (channelsToJoin.add(channel)) {
+                logger.info("Added '" + channel + "' to the list of channels to join");
+            }
+        }
+
         if (!showJoinsParts) {
             return;
         }
@@ -123,24 +138,47 @@ public class MyBot extends PircBot
     @Override
     protected void onDisconnect() {
         logger.info("Disconnected ..");
-        while (!isConnected()) {
-            sleep(Duration.ofMinutes(1));
-            try {
-                logger.info("Trying to reconnect ..");
-                reconnect();
-            } catch (Exception e) {
-                logger.warning("Could not reconnect! " + e.toString());
+
+        long freq = Duration.ofMinutes(1).toMillis();
+        timer.schedule(new TimerTask() {
+
+            @Override
+            public void run() {
+                if (!isConnected()) {
+                    try {
+                        logger.info("Trying to reconnect ..");
+                        reconnect();
+                        for (String channel : channelsToJoin) {
+                            logger.info("Joining '" + channel + "'");
+                            joinChannel(channel);
+                        }
+                    } catch (Exception e) {
+                        logger.warning("Could not reconnect! " + e.toString());
+                    }
+                    timer.schedule(this, freq * 15);
+                }
             }
-        }
+
+        }, freq);
     }
 
     @Override
     protected void onKick(String channel, String kickerNick, String kickerLogin, String kickerHostname, String recipientNick, String reason) {
         if (recipientNick.equalsIgnoreCase(getNick())) {
-            logger.info("Got kicked .. waiting for 10min. until joining again.");
+            logger.info("Got kicked .. waiting for 10 min. until joining again.");
 
-            sleep(Duration.ofMinutes(10));
-            joinChannel(channel);
+            long freq = Duration.ofMinutes(10).toMillis();
+            timer.schedule(new TimerTask() {
+
+                @Override
+                public void run() {
+                    if (Arrays.asList(getChannels()).contains(channel)) {
+                        return;
+                    }
+                    joinChannel(channel);
+                    timer.schedule(this, freq);
+                }
+            }, freq);
         }
     }
 
@@ -151,12 +189,9 @@ public class MyBot extends PircBot
         showJoinsParts = onoff;
     }
 
-    private void sleep(Duration duration) {
-        try {
-            Thread.sleep(duration.toMillis());
-        } catch (InterruptedException e1) {
-            // ignore completely - don't even set the interrupt flag
-        }
-
+    @Override
+    public synchronized void dispose() {
+        timer.cancel();
+        super.dispose();
     }
 }

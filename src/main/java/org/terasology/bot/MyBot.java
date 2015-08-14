@@ -26,6 +26,8 @@ import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.logging.Logger;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -122,12 +124,7 @@ public class MyBot extends PircBot
     protected void onDisconnect() {
         logger.info("Disconnected ..");
         while (!isConnected()) {
-            try {
-                Thread.sleep(1000 * 60);
-            } catch (InterruptedException e1) {
-                // ignore completely - don't even set the interrupt flag
-            }
-
+            sleep(Duration.ofMinutes(1));
             try {
                 logger.info("Trying to reconnect ..");
                 reconnect();
@@ -137,10 +134,29 @@ public class MyBot extends PircBot
         }
     }
 
+    @Override
+    protected void onKick(String channel, String kickerNick, String kickerLogin, String kickerHostname, String recipientNick, String reason) {
+        if (recipientNick.equalsIgnoreCase(getNick())) {
+            logger.info("Got kicked .. waiting for 10min. until joining again.");
+
+            sleep(Duration.ofMinutes(10));
+            joinChannel(channel);
+        }
+    }
+
     /**
      * @param onoff true if join/part messages should be shown
      */
     public void showJoinsParts(boolean onoff) {
         showJoinsParts = onoff;
+    }
+
+    private void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e1) {
+            // ignore completely - don't even set the interrupt flag
+        }
+
     }
 }

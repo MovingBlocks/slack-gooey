@@ -118,6 +118,25 @@ public class MyBot extends PircBot
         logger.info(line);
     }
 
+    @Override
+    protected void onDisconnect() {
+        logger.info("Disconnected ..");
+        while (!isConnected()) {
+            try {
+                Thread.sleep(1000 * 60);
+            } catch (InterruptedException e1) {
+                // ignore completely - don't even set the interrupt flag
+            }
+
+            try {
+                logger.info("Trying to reconnect ..");
+                reconnect();
+            } catch (Exception e) {
+                logger.warning("Could not reconnect! " + e.toString());
+            }
+        }
+    }
+
     /**
      * @param onoff true if join/part messages should be shown
      */

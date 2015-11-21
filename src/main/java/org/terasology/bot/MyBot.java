@@ -140,26 +140,7 @@ public class MyBot extends PircBot
         logger.info("Disconnected ..");
 
         long freq = Duration.ofMinutes(1).toMillis();
-        timer.schedule(new TimerTask() {
-
-            @Override
-            public void run() {
-                if (!isConnected()) {
-                    try {
-                        logger.info("Trying to reconnect ..");
-                        reconnect();
-                        for (String channel : channelsToJoin) {
-                            logger.info("Joining '" + channel + "'");
-                            joinChannel(channel);
-                        }
-                    } catch (Exception e) {
-                        logger.warning("Could not reconnect! " + e.toString());
-                    }
-                    timer.schedule(this, freq * 15);
-                }
-            }
-
-        }, freq);
+        timer.schedule(new ReconnectTask(this), freq);
     }
 
     @Override
@@ -168,17 +149,7 @@ public class MyBot extends PircBot
             logger.info("Got kicked .. waiting for 10 min. until joining again.");
 
             long freq = Duration.ofMinutes(10).toMillis();
-            timer.schedule(new TimerTask() {
-
-                @Override
-                public void run() {
-                    if (Arrays.asList(getChannels()).contains(channel)) {
-                        return;
-                    }
-                    joinChannel(channel);
-                    timer.schedule(this, freq);
-                }
-            }, freq);
+            timer.schedule(new RejoinTask(this, channel), freq);
         }
     }
 
@@ -193,5 +164,61 @@ public class MyBot extends PircBot
     public synchronized void dispose() {
         timer.cancel();
         super.dispose();
+    }
+
+    private void tryToReconnect() {
+        if (!isConnected()) {
+            try {
+                logger.info("Trying to reconnect ..");
+                reconnect();
+                for (String channel : channelsToJoin) {
+                    logger.info("Joining '" + channel + "'");
+                    joinChannel(channel);
+                }
+            } catch (Exception e) {
+                logger.warning("Could not reconnect! " + e.toString());
+                timer.schedule(new ReconnectTask(this), Duration.ofMinutes(15).toMillis());
+            }
+        }
+    }
+
+    private void tryRejoinChannel(String channel) {
+        if (Arrays.asList(getChannels()).contains(channel)) {
+            return;
+        }
+        joinChannel(channel);
+        long freq = Duration.ofMinutes(10).toMillis();
+        timer.schedule(new RejoinTask(this, channel), freq);
+    }
+
+    private static class RejoinTask extends TimerTask {
+
+        private MyBot bot;
+        private String channel;
+
+        public RejoinTask(MyBot bot, String channel) {
+            this.bot = bot;
+            this.channel = channel;
+        }
+
+        @Override
+        public void run() {
+            bot.tryRejoinChannel(channel);
+        }
+
+    }
+    private static class ReconnectTask extends TimerTask {
+
+        private final MyBot bot;
+
+        public ReconnectTask(MyBot bot) {
+            this.bot = bot;
+        }
+
+        @Override
+        public void run() {
+            bot.tryToReconnect();
+        }
+
     }
 }

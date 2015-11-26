@@ -70,7 +70,7 @@ public class MyBot extends PircBot
 
     @Override
     protected void onJoin(String channel, String sender, String login, String hostname) {
-        if (Objects.equals(login, getLogin())) {
+        if (Objects.equals(sender, getName())) {
             if (channelsToJoin.add(channel)) {
                 logger.info("Added '" + channel + "' to the list of channels to join");
             }
